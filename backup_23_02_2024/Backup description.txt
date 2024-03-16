@@ -1,3 +1,0 @@
-Changing text parsing to BeautifulSoup-only
-
-Changing data-structure of page parsing function
