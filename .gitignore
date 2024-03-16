@@ -1,4 +1,6 @@
 *.txt
+*.mp3
+*.mp4
 */
 tg_bot_test.py
 vk_group_page_parser.py
