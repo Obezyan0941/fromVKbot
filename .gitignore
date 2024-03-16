@@ -1,0 +1,7 @@
+*.txt
+*/
+tg_bot_test.py
+vk_group_page_parser.py
+vk_parser_test.py
+vk_temp.py
+vk_video_download_source.py
