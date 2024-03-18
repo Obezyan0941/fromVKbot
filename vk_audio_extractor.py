@@ -20,7 +20,7 @@ def download_audio(title, link):
 
 
 def get_audio(post_id):     # simply parsing vk-api data for direct links
-    access_token = 'cefa34bdcefa34bdcefa34bd87cdec8c5cccefacefa34bdab725c55a5f336c0e50a6dce'
+    access_token = 'vk_api_access_token'
 
     vk_session = vk_api.VkApi(token=access_token)
     vk = vk_session.get_api()
