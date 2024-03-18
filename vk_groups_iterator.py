@@ -1,5 +1,4 @@
 import pymongo
-# import vk_group_page_parser
 import vk_group_page_async
 import time
 import datetime
@@ -21,14 +20,13 @@ def iterate_through_all_groups():
 
     mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
     fromvk_db = mongo_client["fromvk_db"]
-    groups_data = fromvk_db["groups_data"]
-    data_collected = fromvk_db["data_collected"]
-    users_data = fromvk_db["users_data"]
-    user_posts = fromvk_db["user_posts"]
+    groups_data = fromvk_db["groups_data"]  # all groups from all users
+    users_data = fromvk_db["users_data"]  # collection of users with their groups
+    data_collected = fromvk_db["data_collected"]  # time and posts count during scraping
+    user_posts = fromvk_db["user_posts"]  # collection of users with data of wall posts to send
 
+    # get all groups
     all_groups = tuple(groups_data.find({}, {'_id': 0, 'group_URL': 1, 'last_post_ind': 1, "posts_data": 1}))
-
-    # print(all_groups)
 
     time_elapsed_list = []
     for group_info in all_groups:
@@ -36,15 +34,15 @@ def iterate_through_all_groups():
         group_url = group_info["group_URL"]
         time_start = time.perf_counter()
         last_post_ind = group_info["last_post_ind"]
+        # scrape one group
         parsed_data = vk_group_page_async.get_post(driver=driver,
-                                               group_url=group_url,
-                                               last_post_id=last_post_ind)
+                                                   group_url=group_url,
+                                                   last_post_id=last_post_ind)
 
         print(parsed_data)
         time_end = time.perf_counter()
         time_elapsed = time_end - time_start
         print(f"Time elapsed asynchronous: {time_elapsed}")
-        # groups_data.update_one({"group_URL": group_url}, {"$push": {"posts_data": {"$each": parsed_data}}}, upsert=True)
         if parsed_data:
             print("inserted")
             groups_data.update_one({"group_URL": group_url}, {"$set": {"last_post_ind": parsed_data[0]['wall_id'],
@@ -52,17 +50,17 @@ def iterate_through_all_groups():
             data_collected.insert_one({"posts_num": len(parsed_data),
                                        "time_elapsed": time_elapsed,
                                        "date": datetime.datetime.now(tz=datetime.timezone.utc)})
-        else:
+        else:  # error log
             groups_data.update_one({"group_URL": group_url}, {"$set": {"posts_data": False}})
             data_collected.insert_one({"posts_num": 0,
                                        "time_elapsed": time_elapsed,
                                        "date": datetime.datetime.now(tz=datetime.timezone.utc)})
         time_elapsed_list.append(time_elapsed)
 
-
     print(f"Time elapsed max: {max(time_elapsed_list)},\nTime elapsed min: {min(time_elapsed_list)}")
 
-
+    # Pipeline for creating data to send to user_posts, where bot would then take that data
+    # and send messages with it immediately.
     result = tuple(users_data.aggregate([
         {
             '$unwind': '$User_groups'

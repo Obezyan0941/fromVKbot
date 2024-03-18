@@ -2,34 +2,32 @@ import re
 import urllib.parse
 import vk_audio_extractor
 import vk_video_extract
-import pymongo
 import asyncio
 from itertools import compress
 from selenium.webdriver import ChromeOptions
 from seleniumrequests import Chrome
 from bs4 import BeautifulSoup
 
+# get_post is the main function for scraping the web-page of one VK group.
+# It works simply by parsing web page loaded by Selenium and searching strings in html code.
+# For each element of a wall post there are specific functions. Their process is mainly:
+#   1. Parsing page with BeautifulSoup
+#   2. Searching element with regular expressions
+
 
 def get_post(driver, group_url, last_post_id):
-    mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-
-    test_fromvk_db = mongo_client["fromvk_db"]
-    users_data = test_fromvk_db["users_data"]
 
     def transform_link(source_link):
         transformed_link = source_link.replace('&amp', "")
         transformed_link = transformed_link.replace(';', "&")
         return transformed_link
 
-    # url = 'https://vk.com/' + group_id
     url = group_url
 
     driver.get(url)
-    # print(driver.page_source)
 
-    try:
+    try:    # try in case of some error during page loading. Being solved automatically during next scraping run.
         soup = BeautifulSoup(driver.page_source, "html.parser")
-        # public_wall = soup.find('div', {'id': 'public_wall'})
         post_contents = soup.find_all('div', {'class': 'wall_text'})
         wall_posts_found = len(post_contents)
         print("wall_posts_found: ", wall_posts_found)
@@ -51,7 +49,6 @@ def get_post(driver, group_url, last_post_id):
             post_id_found.append(get_post_id(post_content))
 
         if pinned:
-            # post_init_ind += 1
             post_id_found = post_id_found[1:]
             post_contents = post_contents[1:]
 
@@ -95,9 +92,7 @@ def get_post(driver, group_url, last_post_id):
         return is_forward_post, copy_author, copy_post_id
 
     def remove_html_tags(text):
-        # Создаем объект BeautifulSoup
         soup = BeautifulSoup(text, "html.parser")
-        # Получаем текст без HTML-тегов
         clean_text = soup.get_text("\n", strip=True)
         return clean_text
 
@@ -205,14 +200,11 @@ def get_post(driver, group_url, last_post_id):
             post_gif_id = re.sub("\)\"", "", post_gif_id)
             post_gif_id = post_gif_id.replace("\'", "")
             post_gif_id = tuple(map(str, post_gif_id.split(', ')))
-            # print(post_gif_id)
             post_gif_inner_link = 'https://vk.com/doc' + post_gif_id[1] + '?hash=' + post_gif_id[2]
-            # print(post_gif_inner_link)
             driver.get(post_gif_inner_link)
             post_gif_direct_url = re.findall("type=\"hidden\" value=\"https.*?\"", str(driver.page_source))
             post_gif_direct_url = re.sub('type=\"hidden\" value=\"', "", post_gif_direct_url[0])[:-1]
             print(post_gif_direct_url)
-            # https://vk.com/doc592638807_671379248?hash=IXIJypLfo3geN5w0tCZTA0dMlC9BpYzpzS4OrzKG7rT
         else:
             print("No gif found")
         return post_gif_direct_url, is_file_attached
@@ -266,6 +258,7 @@ def get_post(driver, group_url, last_post_id):
                 is_file_attached = True
         return video_args, is_file_attached, post_snippet_link, is_post_snippet_link
 
+    # all processes are handled asynchronously which helped by cutting scraping time by roughly 40%
     async def process_post_content(post_ind_local, post_contents_local, post_contents_i_str_local):
         async_tasks = [
             get_copy_quote(post_contents_local[post_ind_local]),
@@ -286,10 +279,10 @@ def get_post(driver, group_url, last_post_id):
         wall_id = post_id_found[post_ind]
         try:
             post_contents_i_str = str(post_contents[post_ind])
-            # post_header_link, wall_id = get_post_header(post_contents_i_str)
             post_header_link = 'https://vk.com/wall' + wall_id
             results_list = asyncio.run(process_post_content(post_ind, post_contents, post_contents_i_str))
 
+            #   All results are put inside a dictionary for better and easier scaling of a project. It helped.
             results_dict = {'group_name': group_name, 'group_url': group_url, 'wall_id': wall_id,
                             'is_forward_post': results_list[0][0], 'copy_author': results_list[0][1],
                             'copy_post_id': results_list[0][2], 'post_text': results_list[1][0],
@@ -308,6 +301,7 @@ def get_post(driver, group_url, last_post_id):
                     or results_dict['is_video_file_attached']):
                 results_dict['is_file_attached'] = True
 
+            # Fancy way of handling booleans instead of nested if else statements
             is_one_img, is_many_img, is_gif = results_list[2][1], results_list[2][2], results_list[4][1]
             post_mode = tuple(compress(("one_image", "many_images", "_gif"),
                                        (is_one_img, is_many_img, is_gif)))
@@ -319,6 +313,7 @@ def get_post(driver, group_url, last_post_id):
             print(f"post_mode: {post_mode:>20}")
             results_dict['post_mode'] = post_mode
 
+            # Fancy way of handling booleans instead of nested if else statements
             results_dict['post_snippet_link'] = tuple(compress((results_dict['post_snippet_link_any'],
                                                 results_dict['post_snippet_link_video']),
                                                (results_dict['is_post_snippet_link_any'],
@@ -345,20 +340,14 @@ if __name__ == "__main__":
     options = ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--blink-settings=imagesEnabled=false")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-javascript")
+    options.add_argument("--disable-extensions")    # it did not help much with loading time
+    options.add_argument("--disable-javascript")    # it did not help much with loading time
     options.add_argument(
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 "
         "Safari/537.36")
 
     driver = Chrome(options=options)
 
-    # group_id = "meme_kafe"
-    # group_id = "doctorlivesey228"
-    # group_id = "https://vk.com/kpru"
-    # group_id = 'https://vk.com/club224244506'
-    group_id = 'https://vk.com/top.guides_lod'
-    last_post_id = '-205573185_67454'
-    # last_post_id = -15722194_8464212
-    # last_post_id = '-222499729_2526'
+    group_id = 'https://vk.com/group_name'  # sample group URL
+    last_post_id = '-000000000_00000'   # sample last post ID
     get_post(driver, group_id, last_post_id)

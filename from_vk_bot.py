@@ -23,7 +23,7 @@ user_posts = fromvk_db["user_posts"]
 
 
 @bot.message_handler(commands=['start'])
-def start(message):
+def start(message):   # Bot starting function
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     bot.send_message(message.from_user.id,
                      "Добро пожаловать в FromVK bot!\n\n"
@@ -37,7 +37,7 @@ def start(message):
 
 
 @bot.message_handler(commands=['help'])
-def help_command(message):
+def help_command(message):     # help command that shows all possible commands
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     bot.send_message(message.from_user.id,
                      "Основные команды для управления:\n\n\n"
@@ -48,7 +48,7 @@ def help_command(message):
                      reply_markup=markup)
 
 
-def group_pull(group_url):
+def group_pull(group_url):      # def for deleting groups from database
     users_using = groups_data.find_one({'group_URL': group_url}, {"_id": 0, "users_using": 1})[
         'users_using']
     if users_using <= 1:
@@ -58,7 +58,7 @@ def group_pull(group_url):
 
 
 @bot.message_handler(commands=['add'])
-def add_group(message):
+def add_group(message):     # def that handles addition of a new group for a user
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton("Выйти")
     markup.add(btn1)
@@ -106,12 +106,12 @@ def add_group(message):
 
 
 @bot.message_handler(commands=['delete'])
-def delete_group(message):
+def delete_group(message):      # def that handles deletion of a group for a user
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton("Выйти")
     markup.add(btn1)
 
-    def handle_add(message):
+    def handle_delete(message):
         inserted_url = message.text
 
         users_ids = users_data.distinct("_id")
@@ -138,10 +138,10 @@ def delete_group(message):
                                            {"_id": 0, "User_groups": 1})['User_groups']
     list_text = "\n".join(users_group_list)
     bot.send_message(message.from_user.id, f"Список ваших групп:\n\n{list_text}")
-    bot.register_next_step_handler_by_chat_id(message.from_user.id, handle_add)
+    bot.register_next_step_handler_by_chat_id(message.from_user.id, handle_delete)
 
 
-def delete_user(user_id):
+def delete_user(user_id):   # deletes a user in case of blocking the bot
     print("User has blocked the bot")
 
     user_group_list = users_data.find_one({'_id': user_id},
@@ -152,7 +152,7 @@ def delete_user(user_id):
     users_data.delete_one({'_id': user_id})
 
 
-def send_posts(user_id, post_args, is_test=False):
+def send_posts(user_id, post_args, is_test=False):      # function for sending posts
     if is_test:
         user_id = 549648552
     markup = types.ReplyKeyboardRemove()
@@ -229,7 +229,7 @@ def send_posts(user_id, post_args, is_test=False):
                                  "\nК посту прикреплено видео длиннее 30 минут. В данной версии передача таких видео"
                                  "невозможна.", parse_mode='HTML', reply_markup=markup)
 
-    except Exception as e:
+    except Exception as e:      # error logs
         print(e)
         with open(f"error_logs\error_log_sending{post_id}.txt", "w") as f:
             f.write(str(post_args).replace(',', ',\n')+"\n\n"+str(e))
@@ -253,8 +253,8 @@ def handle_user_posts(post_args):
 
 @bot.message_handler(content_types=['text'])
 def handle_random_message(message):
-    if "589032615hfbdvsafjl" in message.text:
-        users_ids = users_data.distinct("_id")
+    if "589032615hfbdvsafjl" in message.text:   # there is a special key that an Admin can use to contact
+        users_ids = users_data.distinct("_id")  # all users through own telegram account
         for user_id in users_ids:
             try:
                 bot.send_message(user_id, message.text[20:])
@@ -270,24 +270,24 @@ def handle_random_message(message):
 print('Online.')
 
 
-def posts_sender():
+def posts_sender():     # main functions that handles scraping and then sending all posts
     minutes_to_await = 45
-    run_sender = True
+    run_sender = True   # just for debug purposes
 
     while run_sender:
         timer_time = minutes_to_await * 60
         time_left = timer_time
 
-        vk_groups_iterator.iterate_through_all_groups()
+        vk_groups_iterator.iterate_through_all_groups()     # runs script that searches all user groups and scrapes data
         all_user_posts = tuple(user_posts.find())
         for current_user_post in all_user_posts:
             try:
                 handle_user_posts(current_user_post)
             except:
-                print("ERROR message was not sent. Something went wrong")
+                print("ERROR message was not sent. Something went wrong")   # This exception was never raised
                 pass
 
-        for tick in range(timer_time):
+        for tick in range(timer_time):  # Initiating timer to wait for each run of scraping and sending
             time.sleep(1)
             time_left -= 1
             if time_left % 60 == 0:
@@ -295,7 +295,7 @@ def posts_sender():
 
 
 def polling_run():
-    bot.polling(non_stop=True, interval=0)
+    bot.polling(non_stop=True, interval=0)  # basic function for a bot to run
 
 
 def create_folders():
@@ -307,14 +307,10 @@ def create_folders():
         os.makedirs("error_logs")
 
 
-def testing():
-    test_data = [[True, False, False, False, True, False], 'абстрактные мемы для элиты всех сортов | АМДЭВС', 'https://vk.com/abstract_memes', '-92337511_2002921', '', '', '', ['https://sun9-77.userapi.com/impg/nhZM5zhBPvtM-Z2H7LM8BXcwPF-JTGrCTMKZwQ/E2so8i-XnSU.jpg?size=814x800&quality=95&sign=4b90a6eb1842922a835757c82981a8b3&c_uniq_tag=yqOFO1rmvQTENtEG0FVKL79DTTDD1o_AW3CfpF_5lTg&type=album'], [], 'https://vk.com/wall-92337511_2002921', '', [], []]
-    send_posts(549648552, test_data)
-    quit()
+create_folders()   # folders for saving videos and audios to send and all error logs
 
-
-create_folders()
-
+# Implementing multithreading for running both basic Telegram bot functions (like handling message responses)
+# and working with MongoDB database, scraping VK groups and sending posts
 thread1 = threading.Thread(target=posts_sender)
 thread2 = threading.Thread(target=polling_run)
 
