@@ -10,7 +10,7 @@ from itertools import compress
 from telebot import types
 from telebot.apihelper import ApiTelegramException
 
-bot = telebot.TeleBot('6436918457:AAHQpL1ratkw72bjheXHFtmgENZIqEcSqGc')
+bot = telebot.TeleBot('telebot_id_number')
 
 hyperlink_text = "image link"
 post_url_text = "Ссылка на пост"
@@ -253,7 +253,7 @@ def handle_user_posts(post_args):
 
 @bot.message_handler(content_types=['text'])
 def handle_random_message(message):
-    if "589032615hfbdvsafjl" in message.text:   # there is a special key that an Admin can use to contact
+    if "key_code" in message.text:   # there is a special key that an Admin can use to contact
         users_ids = users_data.distinct("_id")  # all users through own telegram account
         for user_id in users_ids:
             try:
